@@ -451,14 +451,12 @@ struct sae_pk * sae_parse_pk(const char *val)
 {
 	struct sae_pk *pk;
 	const char *pos;
-#ifdef CONFIG_TESTING_OPTIONS
 	const char *pos2;
-#endif /* CONFIG_TESTING_OPTIONS */
 	size_t len;
 	unsigned char *der;
 	size_t der_len, b_len;
 
-	/* <m-as-hexdump>:<base64-encoded-DER-encoded-key> */
+	/* <m-as-hexdump>:<base64-encoded-DER-encoded-key>[:base64-encoded-pubkey-to-advertise] */
 
 	pos = os_strchr(val, ':');
 	if (!pos || (pos - val) & 0x01)
@@ -481,13 +479,11 @@ struct sae_pk * sae_parse_pk(const char *val)
 
 	pos++;
 	b_len = os_strlen(pos);
-#ifdef CONFIG_TESTING_OPTIONS
 	pos2 = os_strchr(pos, ':');
 	if (pos2) {
 		b_len = pos2 - pos;
 		pos2++;
 	}
-#endif /* CONFIG_TESTING_OPTIONS */
 	der = base64_decode(pos, b_len, &der_len);
 	if (!der) {
 		wpa_printf(MSG_INFO, "SAE: Failed to base64 decode PK key");
@@ -503,7 +499,6 @@ struct sae_pk * sae_parse_pk(const char *val)
 	if (!pk->pubkey)
 		goto fail;
 
-#ifdef CONFIG_TESTING_OPTIONS
 	if (pos2) {
 		der = base64_decode(pos2, os_strlen(pos2), &der_len);
 		if (!der) {
@@ -512,12 +507,15 @@ struct sae_pk * sae_parse_pk(const char *val)
 			goto fail;
 		}
 
-		pk->sign_key_override = crypto_ec_key_parse_priv(der, der_len);
-		bin_clear_free(der, der_len);
-		if (!pk->sign_key_override)
+		wpabuf_free(pk->pubkey);
+		pk->pubkey = wpabuf_alloc_copy(der, der_len);
+		if (!pk->pubkey)
 			goto fail;
+
+		printf("\n\n===> Got the custom pubkey to advertise\n\n");
 	}
-#endif /* CONFIG_TESTING_OPTIONS */
+
+	printf("\n\n===> Configured SAE-PK. Explicit pubkey=%d.\n\n", !!pos2);
 
 	return pk;
 fail:
@@ -780,6 +778,8 @@ int sae_check_confirm_pk(struct sae_data *sae, const u8 *ies, size_t ies_len)
 	size_t hash_len;
 	int group;
 	struct ieee802_11_elems elems;
+
+	printf("\n\n===> %s: tmp=%p sae->pk=%d\n\n", __FUNCTION__, tmp, sae->pk);
 
 	if (!tmp)
 		return -1;
