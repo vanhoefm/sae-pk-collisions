@@ -19,7 +19,7 @@ Then compile hostapd and `sae_pk_gen`:
 	cd ..
 
 
-## Generation cascading SSIDs collisions
+## Generation multi-network SSIDs collisions
 
 First generate a private key:
 
